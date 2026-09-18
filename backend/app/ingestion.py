@@ -21,6 +21,8 @@ class IngestionResult(TypedDict):
     source: str
     chunks_added: int
     page_count: int
+    already_indexed: bool
+    message: str
 
 
 class DocumentIngestionService:
@@ -46,10 +48,20 @@ class DocumentIngestionService:
             original_filename: Original user-provided filename to store in metadata.
 
         Returns:
-            IngestionResult dictionary with source, chunks_added, and page_count.
+            IngestionResult dictionary with source, chunks_added, page_count, and status.
         """
         path = Path(file_path)
         source_name = original_filename or path.name
+
+        # Check if the document is already indexed to prevent duplicate vectors & wasted embeddings
+        if self.vector_store.has_document(source_name):
+            return {
+                "source": source_name,
+                "chunks_added": 0,
+                "page_count": 0,
+                "already_indexed": True,
+                "message": f"Document '{source_name}' is already indexed in your knowledge base.",
+            }
 
         # 1. Extract text and page records from PDF
         pages: list[PageRecord] = extract_pdf_pages(path)
@@ -68,6 +80,8 @@ class DocumentIngestionService:
                 "source": source_name,
                 "chunks_added": 0,
                 "page_count": page_count,
+                "already_indexed": False,
+                "message": f"No text chunks could be extracted from '{source_name}'.",
             }
 
         # 3. Generate Gemini embeddings for all chunks
@@ -80,4 +94,6 @@ class DocumentIngestionService:
             "source": source_name,
             "chunks_added": chunks_added,
             "page_count": page_count,
+            "already_indexed": False,
+            "message": f"Document '{source_name}' indexed successfully ({chunks_added} chunks added).",
         }

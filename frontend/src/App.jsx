@@ -110,7 +110,7 @@ export default function App() {
     setIsLoadingQuery(true);
 
     try {
-      const response = await api.sendQuery(question);
+      const response = await api.sendQuery(question, topK);
 
       const isUngrounded =
         !response.sources ||

@@ -1,8 +1,12 @@
 /**
- * API Service for communicating with the KnoBase FastAPI backend.
+ * API Service for communicating with the InquireAI FastAPI backend.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8000'
+).replace(/\/+$/, '');
 
 class ApiError extends Error {
   constructor(message, status, data) {
@@ -33,10 +37,18 @@ async function request(endpoint, options = {}) {
     const data = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const errorMessage =
-        (typeof data === 'object' && data?.detail) ||
-        (typeof data === 'string' && data) ||
-        `HTTP Error ${response.status}`;
+      let errorMessage = `HTTP Error ${response.status}`;
+      if (typeof data === 'object' && data !== null) {
+        if (typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+          errorMessage = data.detail.map((e) => e.msg || JSON.stringify(e)).join(', ');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+      } else if (typeof data === 'string' && data.trim()) {
+        errorMessage = data;
+      }
       throw new ApiError(errorMessage, response.status, data);
     }
 
@@ -46,7 +58,7 @@ async function request(endpoint, options = {}) {
       throw error;
     }
     throw new ApiError(
-      `Network error: Unable to connect to KnoBase API at ${API_BASE_URL}. Ensure the backend server is running.`,
+      `Network error: Unable to connect to InquireAI API at ${API_BASE_URL}. Ensure the backend server is running and accessible.`,
       0,
       null
     );
@@ -60,7 +72,7 @@ export const api = {
    * Health check
    */
   async checkHealth() {
-    return request('/');
+    return request('/health');
   },
 
   /**
@@ -87,11 +99,12 @@ export const api = {
   /**
    * Query the knowledge base
    * @param {string} question
+   * @param {number} topK
    */
-  async sendQuery(question) {
+  async sendQuery(question, topK = 5) {
     return request('/query', {
       method: 'POST',
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, top_k: Math.min(Math.max(1, topK), 5) }),
     });
   },
 

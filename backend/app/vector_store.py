@@ -1,35 +1,57 @@
 """Persistent ChromaDB storage for precomputed document embeddings.
 
-This module only stores chunks, vectors, and metadata. It does not generate
+This module supports Chroma Cloud and local PersistentClient fallback.
+It only stores chunks, vectors, and metadata. It does not generate
 embeddings or run similarity search.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import Any
 
 import chromadb
 from chromadb.api.models.Collection import Collection
+from dotenv import load_dotenv
+
+# Load backend/.env so Chroma environment variables are available.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DEFAULT_COLLECTION_NAME = "document_knowledge"
+DEFAULT_DATABASE = "inquireai"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PERSIST_DIRECTORY = PROJECT_ROOT / "data" / "chroma_db"
 
 
 class ChromaVectorStore:
-    """Open a local ChromaDB collection and insert already-embedded chunks."""
+    """Connect to Chroma Cloud or local ChromaDB collection."""
 
     def __init__(
         self,
         persist_directory: str | Path | None = None,
         collection_name: str = DEFAULT_COLLECTION_NAME,
     ) -> None:
-        self.persist_directory = Path(persist_directory or DEFAULT_PERSIST_DIRECTORY)
-        self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.collection_name = collection_name
+        self.persist_directory = Path(persist_directory or DEFAULT_PERSIST_DIRECTORY)
 
-        # Persistent client writes the index under data/chroma_db/.
-        self.client = chromadb.PersistentClient(path=str(self.persist_directory))
+        chroma_api_key = os.getenv("CHROMA_API_KEY")
+        chroma_tenant = os.getenv("CHROMA_TENANT")
+        chroma_database = os.getenv("CHROMA_DATABASE", DEFAULT_DATABASE)
+
+        if chroma_api_key:
+            # Connect to Chroma Cloud using official CloudClient API
+            self.client = chromadb.CloudClient(
+                tenant=chroma_tenant,
+                database=chroma_database,
+                api_key=chroma_api_key,
+            )
+            self.is_cloud = True
+        else:
+            # Fallback to local PersistentClient if no Cloud credentials provided
+            self.persist_directory.mkdir(parents=True, exist_ok=True)
+            self.client = chromadb.PersistentClient(path=str(self.persist_directory))
+            self.is_cloud = False
 
         # embedding_function=None: callers must pass Gemini vectors themselves.
         self.collection: Collection = self.client.get_or_create_collection(
@@ -112,4 +134,12 @@ class ChromaVectorStore:
 
         self.collection.delete(where={"source": source})
         return len(existing_ids)
+
+    def has_document(self, source: str) -> bool:
+        """Check whether chunks for the given source document already exist."""
+        if self.count() == 0:
+            return False
+        existing = self.collection.get(where={"source": source}, limit=1)
+        existing_ids = existing.get("ids") or []
+        return len(existing_ids) > 0
 

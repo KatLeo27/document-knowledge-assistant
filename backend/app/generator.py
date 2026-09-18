@@ -18,7 +18,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Load backend/.env so GEMINI_API_KEY is available during local runs.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-DEFAULT_GENERATOR_MODEL = "gemini-2.5-flash"
+DEFAULT_GENERATOR_MODEL = "gemini-flash-latest"
 
 
 class MissingGeminiAPIKeyError(RuntimeError):

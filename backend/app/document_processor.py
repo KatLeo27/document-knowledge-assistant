@@ -13,6 +13,10 @@ from typing import TypedDict
 import pymupdf as fitz  # PyMuPDF (fitz is the historical module name)
 
 
+MAX_PDF_PAGES = 50
+MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 class PageRecord(TypedDict):
     """One page of extracted PDF text plus its source metadata."""
 
@@ -25,11 +29,23 @@ class PDFOpenError(Exception):
     """Raised when a PDF cannot be opened or read."""
 
 
-def extract_pdf_pages(file_path: str | Path) -> list[PageRecord]:
-    """Extract text from every page of a PDF.
+class PDFPageLimitExceededError(Exception):
+    """Raised when a PDF exceeds the maximum page limit."""
+
+
+class PDFNoTextError(Exception):
+    """Raised when a PDF contains no extractable text across all pages."""
+
+
+def extract_pdf_pages(
+    file_path: str | Path,
+    max_pages: int = MAX_PDF_PAGES,
+) -> list[PageRecord]:
+    """Extract text from every page of a PDF with safety limits.
 
     Args:
         file_path: Path to a local PDF file.
+        max_pages: Maximum number of pages allowed.
 
     Returns:
         A list of records, one per page, each containing:
@@ -39,35 +55,50 @@ def extract_pdf_pages(file_path: str | Path) -> list[PageRecord]:
 
     Raises:
         PDFOpenError: if the file is missing, not a PDF, or cannot be opened.
+        PDFPageLimitExceededError: if page count > max_pages.
+        PDFNoTextError: if 0 extractable characters are found across all pages.
     """
     path = Path(file_path)
 
     try:
-        # fitz.open raises FileNotFoundError / empty-file / format errors
-        # depending on what is wrong with the path.
         document = fitz.open(path)
     except Exception as exc:
         raise PDFOpenError(
-            f"Unable to open PDF at '{path}': {exc}"
+            f"Unable to open or parse PDF at '{path}': {exc}"
         ) from exc
 
-    source = path.name
-    records: list[PageRecord] = []
-
     try:
+        total_pages = len(document)
+        if total_pages == 0:
+            raise PDFOpenError("The uploaded PDF has 0 pages.")
+
+        if total_pages > max_pages:
+            raise PDFPageLimitExceededError(
+                f"PDF exceeds the maximum limit of {max_pages} pages (document has {total_pages} pages)."
+            )
+
+        source = path.name
+        records: list[PageRecord] = []
+        total_text_length = 0
+
         for page_index, page in enumerate(document):
-            # get_text() can return None on unusual pages; treat that as empty.
             raw_text = page.get_text() or ""
-            # Keep the record even when the page is blank so page numbers stay
-            # aligned with the original document.
+            stripped = raw_text.strip()
+            total_text_length += len(stripped)
+
             records.append(
                 {
-                    "text": raw_text.strip(),
+                    "text": stripped,
                     "page_number": page_index + 1,
                     "source": source,
                 }
             )
+
+        if total_text_length == 0:
+            raise PDFNoTextError(
+                "The uploaded PDF contains no extractable text. Scanned images without OCR are not supported."
+            )
+
+        return records
     finally:
         document.close()
-
-    return records

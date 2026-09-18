@@ -34,14 +34,8 @@ export default function Sidebar({
           src={logoImg}
           alt="InquireAI Logo"
           className="brand-logo-img"
-          onError={(e) => {
-            e.target.style.display = 'none';
-          }}
         />
-        <div className="brand-info">
-          <span className="brand-name">InquireAI</span>
-          <span className="brand-tagline">Your documents, your knowledge.</span>
-        </div>
+        <span className="brand-name">InquireAI</span>
       </div>
 
       {/* Navigation */}
