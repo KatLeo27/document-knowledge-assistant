@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 
-const COLOR_VARIANTS = ['pink', 'blue', 'yellow', 'sage'];
+const COLOR_VARIANTS = ['rose', 'sage', 'lavender', 'butter'];
 
 export default function DocumentCard({ doc, index, onRequestDelete, isDeleting }) {
   const colorVariant = COLOR_VARIANTS[index % COLOR_VARIANTS.length];

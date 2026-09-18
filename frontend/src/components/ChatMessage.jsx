@@ -31,7 +31,7 @@ export default function ChatMessage({ message }) {
             <div className="assistant-avatar">
               <Sparkles size={14} />
             </div>
-            <span className="assistant-name">KnoBase Assistant</span>
+            <span className="assistant-name">InquireAI Assistant</span>
           </div>
 
           {/* Grounded Indicator Badge */}

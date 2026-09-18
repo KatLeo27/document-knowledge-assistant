@@ -3,9 +3,10 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ChatWorkspace from './components/ChatWorkspace';
 import UploadPanel from './components/UploadPanel';
+import DocumentArchiveView from './components/DocumentArchiveView';
+import SettingsView from './components/SettingsView';
 import Toast from './components/Toast';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
-import SettingsModal from './components/SettingsModal';
 import { api } from './services/api';
 
 export default function App() {
@@ -15,15 +16,39 @@ export default function App() {
   const [isRefreshingStats, setIsRefreshingStats] = useState(false);
   const [backendConnected, setBackendConnected] = useState(true);
 
+  // Theme state ('light' | 'dark')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('inquireai_theme') || 'light';
+  });
+
+  // Top-K retrieval parameter
+  const [topK, setTopK] = useState(() => {
+    const saved = localStorage.getItem('inquireai_top_k');
+    return saved ? Number(saved) : 5;
+  });
+
   const [messages, setMessages] = useState([]);
   const [isLoadingQuery, setIsLoadingQuery] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const [docToDelete, setDocToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  // Apply theme to root document element & persist
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('inquireai_theme', theme);
+  }, [theme]);
+
+  // Persist top-K
+  useEffect(() => {
+    localStorage.setItem('inquireai_top_k', topK.toString());
+  }, [topK]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Add toast notification
   const addToast = useCallback((message, type = 'success', duration = 4500) => {
@@ -65,21 +90,12 @@ export default function App() {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // Handle Tab changes (Settings opens as modal or view)
-  const handleTabChange = (tabId) => {
-    if (tabId === 'settings') {
-      setIsSettingsOpen(true);
-    } else {
-      setActiveTab(tabId);
-    }
-  };
-
   // Send a RAG query
   const handleSendMessage = async (question) => {
     if (!question.trim() || isLoadingQuery) return;
 
-    // Switch to chat workspace view if on Home
-    if (activeTab === 'home') {
+    // Switch to chat workspace view if on Home or other tabs
+    if (activeTab !== 'chat') {
       setActiveTab('chat');
     }
 
@@ -180,17 +196,26 @@ export default function App() {
     addToast('Conversation cleared.', 'info');
   };
 
+  // Ask about a specific document from Archive
+  const handleAskAboutDoc = (doc) => {
+    setActiveTab('chat');
+    handleSendMessage(`What are the key concepts and topics covered in ${doc.source}?`);
+  };
+
+  const showRightPanel = activeTab === 'home' || activeTab === 'chat';
+
   return (
     <div className="app-container">
       {/* Pastel Background Blobs */}
       <div className="pastel-blob blob-1" />
       <div className="pastel-blob blob-2" />
       <div className="pastel-blob blob-3" />
+      <div className="pastel-blob blob-4" />
 
       {/* Left Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={handleTabChange}
+        setActiveTab={setActiveTab}
         stats={stats}
         isRefreshingStats={isRefreshingStats}
         onRefreshStats={fetchDocuments}
@@ -198,30 +223,56 @@ export default function App() {
       />
 
       {/* Main Column */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
         <Header
           activeTab={activeTab}
           hasMessages={messages.length > 0}
           onClearChat={handleClearChat}
         />
 
-        <ChatWorkspace
-          messages={messages}
-          isLoadingQuery={isLoadingQuery}
-          onSendMessage={handleSendMessage}
-          onSelectSuggestion={handleSendMessage}
-          documentCount={documents.length}
-        />
+        {activeTab === 'home' || activeTab === 'chat' ? (
+          <ChatWorkspace
+            messages={messages}
+            isLoadingQuery={isLoadingQuery}
+            onSendMessage={handleSendMessage}
+            onSelectSuggestion={handleSendMessage}
+            documentCount={documents.length}
+          />
+        ) : activeTab === 'documents' ? (
+          <DocumentArchiveView
+            documents={documents}
+            isUploading={isUploading}
+            onUploadFile={handleUploadFile}
+            onRequestDelete={(doc) => setDocToDelete(doc)}
+            deletingDoc={docToDelete?.source}
+            onAskAboutDoc={handleAskAboutDoc}
+          />
+        ) : activeTab === 'settings' ? (
+          <SettingsView
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            topK={topK}
+            onChangeTopK={setTopK}
+            stats={stats}
+            backendConnected={backendConnected}
+            onClearChat={handleClearChat}
+            onRefreshStats={fetchDocuments}
+            isRefreshingStats={isRefreshingStats}
+            hasMessages={messages.length > 0}
+          />
+        ) : null}
       </div>
 
-      {/* Right Panel (Upload & Document Management) */}
-      <UploadPanel
-        documents={documents}
-        isUploading={isUploading}
-        onUploadFile={handleUploadFile}
-        onRequestDelete={(doc) => setDocToDelete(doc)}
-        deletingDoc={docToDelete?.source}
-      />
+      {/* Right Panel (Upload & Quick Document Management on Home & Chat) */}
+      {showRightPanel && (
+        <UploadPanel
+          documents={documents}
+          isUploading={isUploading}
+          onUploadFile={handleUploadFile}
+          onRequestDelete={(doc) => setDocToDelete(doc)}
+          deletingDoc={docToDelete?.source}
+        />
+      )}
 
       {/* Modals & Toasts */}
       <DeleteConfirmModal
@@ -229,12 +280,6 @@ export default function App() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setDocToDelete(null)}
         isDeleting={isDeleting}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        backendConnected={backendConnected}
       />
 
       <Toast toasts={toasts} onDismiss={dismissToast} />

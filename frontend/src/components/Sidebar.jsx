@@ -9,6 +9,7 @@ import {
   Layers,
   RefreshCw,
 } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function Sidebar({
   activeTab,
@@ -28,12 +29,17 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="brand-icon">
-          <Sparkles size={22} />
-        </div>
+      <div className="sidebar-brand" onClick={() => setActiveTab('home')} title="InquireAI Home">
+        <img
+          src={logoImg}
+          alt="InquireAI Logo"
+          className="brand-logo-img"
+          onError={(e) => {
+            e.target.style.display = 'none';
+          }}
+        />
         <div className="brand-info">
-          <span className="brand-name">KnoBase</span>
+          <span className="brand-name">InquireAI</span>
           <span className="brand-tagline">Your documents, your knowledge.</span>
         </div>
       </div>
@@ -81,8 +87,8 @@ export default function Sidebar({
             <span className="stat-value">{stats.documentCount}</span>
           </div>
 
-          {/* Chunks Card (Pastel Pink) */}
-          <div className="stat-card pink">
+          {/* Chunks Card (Pastel Rose) */}
+          <div className="stat-card rose">
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Layers size={14} />
               <span className="stat-label">Total Chunks</span>

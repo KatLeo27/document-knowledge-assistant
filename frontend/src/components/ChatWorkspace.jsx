@@ -1,12 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import {
-  HelpCircle,
-  Files,
-  ShieldCheck,
-  Zap,
-  Sparkles,
-} from 'lucide-react';
-import FeatureCard from './FeatureCard';
+import { Sparkles } from 'lucide-react';
 import SuggestedQuestions from './SuggestedQuestions';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
@@ -18,23 +11,24 @@ export default function ChatWorkspace({
   onSelectSuggestion,
   documentCount,
 }) {
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
-    scrollToBottom();
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   }, [messages, isLoadingQuery]);
 
   const hasMessages = messages.length > 0;
 
   return (
     <main className="main-workspace">
-      <div className="chat-messages-container">
+      <div className="chat-messages-container" ref={chatContainerRef}>
         {!hasMessages ? (
-          /* Empty / Welcome Hero State */
+          /* Clean & Minimal Welcome Hero State */
           <div className="empty-workspace">
             <div className="hero-badge">
               <Sparkles size={14} />
@@ -49,34 +43,6 @@ export default function ChatWorkspace({
             <p className="hero-subtext">
               Upload your documents, ask questions, and get accurate, grounded answers using AI.
             </p>
-
-            {/* 4 Feature Cards */}
-            <div className="features-grid">
-              <FeatureCard
-                icon={HelpCircle}
-                color="green"
-                title="Ask Questions"
-                description="Get answers directly extracted and synthesized from your documents."
-              />
-              <FeatureCard
-                icon={Files}
-                color="pink"
-                title="Multiple Documents"
-                description="Work with all your indexed PDFs seamlessly in a unified knowledge base."
-              />
-              <FeatureCard
-                icon={ShieldCheck}
-                color="yellow"
-                title="Grounded Answers"
-                description="See exact page citations and stay confident against hallucinations."
-              />
-              <FeatureCard
-                icon={Zap}
-                color="blue"
-                title="Save Time"
-                description="Find key information, summaries, and definitions in seconds."
-              />
-            </div>
 
             {/* Suggested Question Pills */}
             <SuggestedQuestions onSelectQuestion={onSelectSuggestion} />
@@ -108,8 +74,6 @@ export default function ChatWorkspace({
                 </div>
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </>
         )}
       </div>
