@@ -79,3 +79,37 @@ class ChromaVectorStore:
     def count(self) -> int:
         """Return how many items are currently in the collection."""
         return self.collection.count()
+
+    def list_documents(self) -> list[dict[str, Any]]:
+        """Return a summary of indexed documents with chunk counts."""
+        if self.count() == 0:
+            return []
+
+        data = self.collection.get(include=["metadatas"])
+        metadatas = data.get("metadatas") or []
+
+        counts: dict[str, int] = {}
+        for meta in metadatas:
+            if meta and "source" in meta:
+                source = str(meta["source"])
+                counts[source] = counts.get(source, 0) + 1
+
+        return [
+            {"source": source, "chunk_count": count}
+            for source, count in sorted(counts.items())
+        ]
+
+    def delete_document(self, source: str) -> int:
+        """Delete all chunks belonging to a specific source document.
+
+        Returns:
+            The number of chunks deleted.
+        """
+        existing = self.collection.get(where={"source": source})
+        existing_ids = existing.get("ids") or []
+        if not existing_ids:
+            return 0
+
+        self.collection.delete(where={"source": source})
+        return len(existing_ids)
+
