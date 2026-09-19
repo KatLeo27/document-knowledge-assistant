@@ -162,11 +162,22 @@ class DocumentAnswerGenerator:
         ]
 
         response = self.llm.invoke(messages)
-        answer_text = (
-            response.content
-            if isinstance(response.content, str)
-            else str(response.content)
-        )
+        raw_content = response.content
+
+        if isinstance(raw_content, str):
+            answer_text = raw_content
+        elif isinstance(raw_content, list):
+            text_parts = []
+            for item in raw_content:
+                if isinstance(item, str):
+                    text_parts.append(item)
+                elif isinstance(item, dict) and "text" in item:
+                    text_parts.append(str(item["text"]))
+                elif hasattr(item, "text"):
+                    text_parts.append(str(item.text))
+            answer_text = "".join(text_parts) if text_parts else str(raw_content)
+        else:
+            answer_text = str(raw_content)
 
         return {
             "answer": answer_text.strip(),
